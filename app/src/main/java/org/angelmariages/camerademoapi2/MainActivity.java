@@ -35,7 +35,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Collections;
 
 /**
@@ -54,7 +53,6 @@ public class MainActivity extends AppCompatActivity {
 	private CameraCaptureSession mCaptureSession;
 	private int mCameraHeight;
 	private int mCameraWidth;
-	private Surface mSurface;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -109,10 +107,8 @@ public class MainActivity extends AppCompatActivity {
 			 *  un màxim d'una foto */
 			ImageReader imageReader = ImageReader.newInstance(mCameraWidth, mCameraHeight, ImageFormat.JPEG, 1);
 
-			Surface imageReaderSurface = imageReader.getSurface();
 			/** Aquest imageReader té un surfaceView al qual li passem la imatge de la càmera */
-			ArrayList<Surface> outputSurfaces = new ArrayList<>();
-			outputSurfaces.add(imageReaderSurface);
+			Surface imageReaderSurface = imageReader.getSurface();
 
 			/** Creem una petició de captura a la càmera */
 			final CaptureRequest.Builder captureBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
@@ -152,7 +148,7 @@ public class MainActivity extends AppCompatActivity {
 				}
 			};
 
-			mCameraDevice.createCaptureSession(outputSurfaces, new CameraCaptureSession.StateCallback() {
+			mCameraDevice.createCaptureSession(Collections.singletonList(imageReaderSurface), new CameraCaptureSession.StateCallback() {
 				@Override
 				public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {
 					try {
@@ -203,14 +199,14 @@ public class MainActivity extends AppCompatActivity {
 		if (surfaceTexture == null) {
 			return;
 		}
-		mSurface = new Surface(surfaceTexture);
+		Surface surface = new Surface(surfaceTexture);
 
 		try {
 			/** Creem una petició de previsualització amb el "target", la surface dins del textureView */
 			mPreviewRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
-			mPreviewRequestBuilder.addTarget(mSurface);
+			mPreviewRequestBuilder.addTarget(surface);
 
-			mCameraDevice.createCaptureSession(Collections.singletonList(mSurface), new CameraCaptureSession.StateCallback() {
+			mCameraDevice.createCaptureSession(Collections.singletonList(surface), new CameraCaptureSession.StateCallback() {
 				@Override
 				public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {
 					/** Si no hi ha càmera, sortim */
@@ -223,7 +219,7 @@ public class MainActivity extends AppCompatActivity {
 						/** Deixem que la càmera ajusti automàticament la millor visualització*/
 						mPreviewRequestBuilder.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO);
 
-						/** Creem una captura "repetitiva" que es mostrara al {@link mSurface} */
+						/** Creem una captura "repetitiva" que es mostrara al surface */
 						mCaptureSession.setRepeatingRequest(mPreviewRequestBuilder.build(), null, null);
 					} catch (CameraAccessException e) {
 						e.printStackTrace();
