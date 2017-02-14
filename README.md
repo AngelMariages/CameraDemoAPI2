@@ -4,7 +4,7 @@ A demo app showing how to do a simple preview and save pictures with the [androi
 ###### It doesn't use handlers for simplicity
 
 ## Pictures
-
+<img src="https://raw.githubusercontent.com/AngelMariages/CameraDemoAPI2/master/Screenshot_1487092104.png" width="250">
 
 ## Summary
 1. First of all we need the permissions to acces the camera and write to the external storage for saving pictures:
