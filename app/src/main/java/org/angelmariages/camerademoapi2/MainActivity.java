@@ -164,7 +164,8 @@ public class MainActivity extends AppCompatActivity {
 						/** Intentem crear una captura que gestionara el {@link captureCallback}*/
 						cameraCaptureSession.capture(captureBuilder.build(), captureCallback, null);
 					} catch (CameraAccessException e) {
-						e.printStackTrace();
+						Log.d("TAG", "Error creating the capture");
+						Log.d("TAG", e.getMessage());
 					}
 				}
 
@@ -174,7 +175,8 @@ public class MainActivity extends AppCompatActivity {
 				}
 			}, null);
 		} catch (CameraAccessException e) {
-			e.printStackTrace();
+			Log.d("TAG", "Error taking the picture");
+			Log.d("TAG", e.getMessage());
 		}
 	}
 
@@ -236,7 +238,8 @@ public class MainActivity extends AppCompatActivity {
 						/** Creem una captura "repetitiva" que es mostrara al surface */
 						mCaptureSession.setRepeatingRequest(mPreviewRequestBuilder.build(), null, null);
 					} catch (CameraAccessException e) {
-						e.printStackTrace();
+						Log.d("TAG", "Error creating the preview session");
+						Log.d("TAG", e.getMessage());
 					}
 				}
 
@@ -246,7 +249,8 @@ public class MainActivity extends AppCompatActivity {
 				}
 			}, null);
 		} catch (CameraAccessException e) {
-			e.printStackTrace();
+			Log.d("TAG", "Error setting up the camera preview");
+			Log.d("TAG", e.getMessage());
 		}
 	}
 
@@ -277,7 +281,8 @@ public class MainActivity extends AppCompatActivity {
 				mCameraHeight = outputSizes[0].getHeight();
 			}
 		} catch (CameraAccessException e) {
-			e.printStackTrace();
+			Log.d("TAG", "Error setting up the camera");
+			Log.d("TAG", e.getMessage());
 		}
 	}
 
