@@ -19,9 +19,15 @@
         android:layout_weight="1"/>
 
     <Button
-        android:text="Button"
+        android:text="Take picture"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:id="@+id/captureButton"
         />
+
+    <Button
+        android:text="Switch camera"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/switchCamera"/>
 </LinearLayout>

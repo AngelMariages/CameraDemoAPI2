@@ -1,9 +1,8 @@
 package org.angelmariages.camerademoapi2;
 
-import android.Manifest;
 import android.content.ContentValues;
 import android.content.Context;
-import android.content.pm.PackageManager;
+import android.content.Intent;
 import android.graphics.ImageFormat;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
@@ -20,7 +19,6 @@ import android.media.ImageReader;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
-import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -38,10 +36,8 @@ import java.nio.ByteBuffer;
 import java.util.Collections;
 
 /**
- *
  * Àngel Mariages - 06/02/2017
- *
- * */
+ */
 
 public class MainActivity extends AppCompatActivity {
 
@@ -53,6 +49,7 @@ public class MainActivity extends AppCompatActivity {
 	private CameraCaptureSession mCaptureSession;
 	private int mCameraHeight;
 	private int mCameraWidth;
+	private int mCameraFacing = CameraCharacteristics.LENS_FACING_BACK;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -60,10 +57,17 @@ public class MainActivity extends AppCompatActivity {
 		setContentView(R.layout.activity_main);
 
 		Button captureButton = (Button) findViewById(R.id.captureButton);
+		Button switchButton = (Button) findViewById(R.id.switchCamera);
 		captureButton.setOnClickListener(new View.OnClickListener() {
 			@Override
 			public void onClick(View view) {
 				takePicture();
+			}
+		});
+		switchButton.setOnClickListener(new View.OnClickListener() {
+			@Override
+			public void onClick(View view) {
+				switchCamera();
 			}
 		});
 		mTextureView = (TextureView) findViewById(R.id.textureView);
@@ -76,7 +80,8 @@ public class MainActivity extends AppCompatActivity {
 			}
 
 			@Override
-			public void onSurfaceTextureSizeChanged(SurfaceTexture surfaceTexture, int i, int i1) { }
+			public void onSurfaceTextureSizeChanged(SurfaceTexture surfaceTexture, int i, int i1) {
+			}
 
 			@Override
 			public boolean onSurfaceTextureDestroyed(SurfaceTexture surfaceTexture) {
@@ -84,7 +89,8 @@ public class MainActivity extends AppCompatActivity {
 			}
 
 			@Override
-			public void onSurfaceTextureUpdated(SurfaceTexture surfaceTexture) { }
+			public void onSurfaceTextureUpdated(SurfaceTexture surfaceTexture) {
+			}
 		});
 	}
 
@@ -93,7 +99,10 @@ public class MainActivity extends AppCompatActivity {
 		super.onPause();
 		/** Quan l'activity faci onPause tanquem la càmera
 		 *  no necessitem obrirla a onResume perquè el surfaceTextureListener ja s'encarrega */
-		if(mCameraDevice != null) mCameraDevice.close();
+		if (mCameraDevice != null) {
+			mCameraDevice.close();
+			mCameraDevice = null;
+		}
 	}
 
 	private void takePicture() {
@@ -189,14 +198,19 @@ public class MainActivity extends AppCompatActivity {
 
 			MainActivity.this.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
 		} catch (IOException e) {
-			e.printStackTrace();
+			if (e.getMessage().contains("EACCES")) {
+				startActivity(new Intent(this, RequestPermissionsActivity.class));
+			} else {
+				Log.d("TAG", "Can't save file");
+				Log.d("TAG", e.getMessage());
+			}
 		}
 	}
 
 	private void setupCameraPreview() {
 		SurfaceTexture surfaceTexture = mTextureView.getSurfaceTexture();
 		/** Si no hi ha surface, sortim */
-		if (surfaceTexture == null) {
+		if (surfaceTexture == null || mCameraDevice == null) {
 			return;
 		}
 		Surface surface = new Surface(surfaceTexture);
@@ -243,16 +257,16 @@ public class MainActivity extends AppCompatActivity {
 		try {
 			for (String cameraId : cameraManager.getCameraIdList()) {
 				CameraCharacteristics cameraCharacteristics = cameraManager.getCameraCharacteristics(cameraId);
-				/**Si la càmera no és la que esta enfocant al darrere saltem a la següent*/
+				/**Si la càmera no és la que esta enfocant al costat que volem saltem a la següent*/
 				Integer lensFacing = cameraCharacteristics.get(CameraCharacteristics.LENS_FACING);
-				if (lensFacing != null && lensFacing != CameraCharacteristics.LENS_FACING_BACK) {
-					/** Només volem la càmera que enfoca cap al darrere */
+				if (lensFacing != null && lensFacing != mCameraFacing) {
+					/** Només volem la càmera que enfoca cap al costat que hem seleccionat */
 					continue;
 				}
 				/**Agafem la id de la càmera que volem*/
 				mCameraId = cameraId;
 				StreamConfigurationMap streamConfigurationMap = cameraCharacteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-				if(streamConfigurationMap == null) {
+				if (streamConfigurationMap == null) {
 					throw new RuntimeException("Can't get camera sizes");
 				}
 
@@ -291,22 +305,35 @@ public class MainActivity extends AppCompatActivity {
 		};
 	}
 
+	@SuppressWarnings("MissingPermission")
 	private void openCamera() {
 		/** Servei de càmeres del sistema per obtenir totes les càmeres disponibles*/
 		CameraManager cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
 
-		// TODO: 2/9/17 Comprovar permissos
-
 		try {
-			if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-				return;
-			}
-
 			/** Obrim la càmera amb l'id que hem seleccionat fent servir -> {@link #setupCamera()}
 			 *  el {@link #configureCameraStateCallback()} ens permet tenir control sobre l'estat de la càmera */
 			cameraManager.openCamera(mCameraId, mStateCallback, null);
 		} catch (CameraAccessException e) {
-			e.printStackTrace();
+			Log.d("TAG", "Can't open camera");
+			Log.d("TAG", e.getMessage());
+		} catch (SecurityException e) {
+			startActivity(new Intent(this, RequestPermissionsActivity.class));
 		}
+	}
+
+	private void switchCamera() {
+		if (mCameraFacing == CameraCharacteristics.LENS_FACING_BACK) {
+			mCameraFacing = CameraCharacteristics.LENS_FACING_FRONT;
+		} else {
+			mCameraFacing = CameraCharacteristics.LENS_FACING_BACK;
+		}
+
+		mCameraDevice.close();
+		mCameraDevice = null;
+
+		setupCamera();
+		configureCameraStateCallback();
+		openCamera();
 	}
 }
