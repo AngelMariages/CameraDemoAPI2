@@ -4,6 +4,8 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.ImageFormat;
+import android.graphics.Matrix;
+import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
@@ -16,16 +18,15 @@ import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
+import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
 import android.view.TextureView;
-import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
@@ -58,29 +59,21 @@ public class MainActivity extends AppCompatActivity {
 
 		Button captureButton = (Button) findViewById(R.id.captureButton);
 		Button switchButton = (Button) findViewById(R.id.switchCamera);
-		captureButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View view) {
-				takePicture();
-			}
-		});
-		switchButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View view) {
-				switchCamera();
-			}
-		});
+		captureButton.setOnClickListener(view -> takePicture());
+		switchButton.setOnClickListener(view -> switchCamera());
 		mTextureView = (TextureView) findViewById(R.id.textureView);
 		mTextureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
 			@Override
-			public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int i, int i1) {
+			public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int width, int height) {
 				setupCamera();
 				configureCameraStateCallback();
+				//transformImage(width, height);
 				openCamera();
 			}
 
 			@Override
-			public void onSurfaceTextureSizeChanged(SurfaceTexture surfaceTexture, int i, int i1) {
+			public void onSurfaceTextureSizeChanged(SurfaceTexture surfaceTexture, int width, int height) {
+				//transformImage(width, height);
 			}
 
 			@Override
@@ -124,22 +117,23 @@ public class MainActivity extends AppCompatActivity {
 			/** El target aquest cop serà el imageReaderSurface en comptes del TextureView */
 			captureBuilder.addTarget(imageReaderSurface);
 			/** Tornem a deixar que la càmera faci el millor que pugui amb la foto*/
-			captureBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+			captureBuilder.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+			CameraManager manager = (CameraManager) MainActivity.this.getSystemService(Context.CAMERA_SERVICE);
+			CameraCharacteristics cameraCharacteristics = manager.getCameraCharacteristics("" + mCameraDevice.getId());
+			int rotation = cameraCharacteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
+			captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, rotation);
 
-			ImageReader.OnImageAvailableListener imageAvailableListener = new ImageReader.OnImageAvailableListener() {
-				@Override
-				public void onImageAvailable(ImageReader imageReader) {
-					/** Obtenim la imatge del imageReader */
-					Image image = imageReader.acquireLatestImage();
-					ByteBuffer buffer = image.getPlanes()[0].getBuffer();
-					byte[] bytes = new byte[buffer.capacity()];
-					/** Convertim el buffer de bytes a un array de bytes */
-					buffer.get(bytes);
-					/** Guardem la foto */
-					savePicture(bytes);
-					image.close();
-				}
-			};
+			ImageReader.OnImageAvailableListener imageAvailableListener = imageReader1 -> {
+                /** Obtenim la imatge del imageReader */
+                Image image = imageReader1.acquireLatestImage();
+                ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+                byte[] bytes = new byte[buffer.capacity()];
+                /** Convertim el buffer de bytes a un array de bytes */
+                buffer.get(bytes);
+                /** Guardem la foto */
+                savePicture(bytes);
+                image.close();
+            };
 
 			imageReader.setOnImageAvailableListener(imageAvailableListener, null);
 
@@ -181,12 +175,11 @@ public class MainActivity extends AppCompatActivity {
 	}
 
 	private void savePicture(byte[] bytes) {
-		File mediaFileDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "Test");
-		File mediaFile = new File(mediaFileDir.getPath() + File.pathSeparatorChar + System.currentTimeMillis());
+		File mediaFileDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
+		File mediaFile = new File(mediaFileDir.getPath() + "/" + System.currentTimeMillis() + "_Test.jpg");
 		try {
 			FileOutputStream fileOutputStream = new FileOutputStream(mediaFile);
 			fileOutputStream.write(bytes);
-			fileOutputStream.flush();
 			fileOutputStream.close();
 
 			Toast.makeText(MainActivity.this, "Foto guardada", Toast.LENGTH_SHORT).show();
@@ -340,5 +333,27 @@ public class MainActivity extends AppCompatActivity {
 		setupCamera();
 		configureCameraStateCallback();
 		openCamera();
+	}
+
+	private void transformImage(int width, int height) {
+		if(mTextureView == null) {
+			return;
+		}
+		Matrix matrix = new Matrix();
+		int rotation = getWindowManager().getDefaultDisplay().getRotation();
+		RectF textureRectF = new RectF(0, 0, width, height);
+		RectF previewRectF = new RectF(0, 0, mCameraHeight, mCameraWidth);
+		float centerX = textureRectF.centerX();
+		float centerY = textureRectF.centerY();
+		if(rotation == Surface.ROTATION_90 || rotation == Surface.ROTATION_270) {
+			previewRectF.offset(centerX - previewRectF.centerX(),
+					centerY - previewRectF.centerY());
+			matrix.setRectToRect(textureRectF, previewRectF, Matrix.ScaleToFit.FILL);
+			float scale = Math.max((float)width / mCameraWidth,
+					(float)height / mCameraHeight);
+			matrix.postScale(scale, scale, centerX, centerY);
+			matrix.postRotate(90 * (rotation - 2), centerX, centerY);
+		}
+		mTextureView.setTransform(matrix);
 	}
 }
